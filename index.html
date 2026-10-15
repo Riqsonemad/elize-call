@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ELIZE">
+<meta name="theme-color" content="#1E5A47">
+<title>ELIZE – New call</title>
+<style>
+ body{font-family:-apple-system,Segoe UI,Arial,sans-serif;background:#F6F4EE;color:#0F1D18;margin:0}
+ .w{max-width:620px;margin:0 auto;padding:20px 16px 60px}
+ .brand{font-weight:700;letter-spacing:.12em;color:#1E5A47;font-size:13px}
+ h1{font-size:26px;margin:4px 0 4px} .sub{color:#4A5850;margin:0 0 18px}
+ label{display:block;font-weight:600;font-size:14px;margin:14px 0 6px}
+ input,select,textarea{width:100%;box-sizing:border-box;font-size:16px;padding:12px;border:1px solid #CFD8D2;border-radius:10px;background:#fff;color:#0F1D18}
+ textarea{min-height:170px;line-height:1.45}
+ .card{background:#fff;border:1px solid #E1E6E2;border-radius:14px;padding:16px;margin:16px 0}
+ .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+ button{font-size:16px;font-weight:600;border:0;border-radius:999px;padding:13px 20px;cursor:pointer}
+ button:disabled{opacity:.6}
+ .rec{background:#1E5A47;color:#fff} .rec.on{background:#A4262C}
+ .up{background:#EEF3F0;color:#1E5A47} .send{background:#E6A93A;color:#0F1D18;width:100%;margin-top:18px;padding:16px}
+ .muted{color:#4A5850;font-size:14px} .err{color:#A4262C;font-size:14px} .ok{color:#107C10;font-size:14px}
+ .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#A4262C;margin-right:6px;animation:p 1s infinite}
+ @keyframes p{50%{opacity:.3}} .req{color:#A4262C}
+ #gate{display:none} 
+</style></head><body><div class="w">
+<div class="brand">ELIZE</div>
+<h1>New call</h1><p class="sub">Type the details, then record your call notes.</p>
+
+<div id="gate" class="card"><b>This link is incomplete.</b><p class="muted">Open the New call link from your ELIZE email or approvals page, then save that page to your home screen.</p></div>
+
+<div id="app">
+<div class="card">
+ <label>Contact name <span class="req">*</span></label><input id="contact" autocomplete="off">
+ <label>Company / brand</label><input id="company" autocomplete="off">
+ <label>Email address <span class="req">*</span></label><input id="email" type="email" autocomplete="off" autocapitalize="off">
+ <label>Phone (optional)</label><input id="phone" type="tel">
+ <label>Business type <span class="req">*</span></label><select id="type"><option value="">Choose…</option></select>
+ <label>Space needed (approx m²)</label><input id="space" inputmode="numeric">
+ <label>Unit to offer</label><select id="units"><option>Let the system suggest</option></select>
+</div>
+
+<div class="card">
+ <label style="margin-top:0">Call notes</label>
+ <p class="muted" style="margin:0 0 12px">Talk freely: what they need, what they care about, concerns, timing. You can edit the text before sending.</p>
+ <div class="row">
+  <button type="button" class="rec" id="recBtn">🎙 Record</button>
+  <button type="button" class="up" id="upBtn">Upload a recording</button>
+  <input type="file" id="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.webm,.mp4,.ogg" style="display:none">
+ </div>
+ <p id="status" class="muted" style="margin:12px 0 0"></p>
+ <label>Notes (edit before sending)</label>
+ <textarea id="notes" placeholder="Your transcript appears here. You can also just type."></textarea>
+</div>
+
+<button type="button" class="send" id="sendBtn">Send to ELIZE</button>
+<p id="done" class="ok" style="text-align:center"></p>
+<p class="muted" style="text-align:center;margin-top:20px">Recordings are deleted straight after transcription. Nothing reaches a tenant until you send it from Outlook.</p>
+</div>
+</div>
+<script>
+// The ELIZE address (u) and secret key (k) come from the part of the link after "#".
+// Browsers never send that part to this website's host; it only goes to ELIZE.
+const MAX = 20 * 1024 * 1024;
+const $ = id => document.getElementById(id);
+const st = (t, c) => { $('status').className = c || 'muted'; $('status').innerHTML = t; };
+let U = '', K = '', VALID = false;
+(function readLink() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  U = h.get('u') || ''; K = h.get('k') || '';
+  try {
+    if (U && K && /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(U)) localStorage.setItem('elize', JSON.stringify({ u: U, k: K }));
+    else { const s = JSON.parse(localStorage.getItem('elize') || '{}'); U = s.u || ''; K = s.k || ''; }
+  } catch (e) {}
+  VALID = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(U) && !!K;
+  if (!VALID) { U = ''; K = ''; $('gate').style.display = 'block'; $('app').style.display = 'none'; }
+})();
+
+async function api(action, body) {
+  if (!VALID) throw new Error('this link is incomplete');
+  const opts = body ? { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ k: K }, body)) } : {};
+  const url = U + '?action=' + action + (body ? '' : '&k=' + encodeURIComponent(K));
+  const r = await fetch(url, opts);
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'something went wrong');
+  return j;
+}
+
+(async function loadOptions() {
+  if (!VALID) return;
+  try {
+    const c = await api('api_config');
+    c.types.forEach(t => $('type').add(new Option(t, t)));
+    c.units.forEach(u => $('units').add(new Option(u, u)));
+  } catch (e) { st('Could not reach ELIZE: ' + e.message, 'err'); }
+})();
+
+function micOk() { return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder); }
+function pickType() { const t = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg']; for (const x of t) { if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(x)) return x; } return ''; }
+function micFallback(msg) { st(msg + ' Use <b>Upload a recording</b> instead: record in your Voice Memos app, then upload it here.', 'err'); $('upBtn').style.outline = '3px solid #E6A93A'; }
+
+let rec = null, chunks = [], timer = null, secs = 0, stream = null;
+$('recBtn').onclick = async () => {
+  if (rec && rec.state === 'recording') { rec.stop(); return; }
+  if (!micOk()) { micFallback('Recording is not available in this browser.'); return; }
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { micFallback('The microphone could not be opened' + (e && e.name === 'NotAllowedError' ? ' (permission was not given).' : '.')); return; }
+  const type = pickType(); chunks = [];
+  rec = type ? new MediaRecorder(stream, { mimeType: type }) : new MediaRecorder(stream);
+  rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  rec.onstop = () => {
+    clearInterval(timer); stream.getTracks().forEach(t => t.stop());
+    $('recBtn').classList.remove('on'); $('recBtn').textContent = '🎙 Record again';
+    send(new Blob(chunks, { type: rec.mimeType || type || 'audio/webm' }), 'recording');
+  };
+  rec.start(1000); secs = 0; $('recBtn').classList.add('on'); $('recBtn').textContent = '■ Stop';
+  st('<span class="dot"></span>Recording… 0:00');
+  timer = setInterval(() => { secs++; st('<span class="dot"></span>Recording… ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0')); if (secs >= 300) rec.stop(); }, 1000);
+};
+
+$('upBtn').onclick = () => $('file').click();
+$('file').onchange = e => { const f = e.target.files[0]; if (f) send(f, f.name); e.target.value = ''; };
+
+function send(blob, name) {
+  if (!blob.size) { st('That recording was empty. Please try again.', 'err'); return; }
+  if (blob.size > MAX) { st('That file is too large (over 20 MB). Please record a shorter note.', 'err'); return; }
+  st('Transcribing… this takes a few seconds.');
+  const r = new FileReader();
+  r.onload = async () => {
+    try {
+      const j = await api('api_transcribe', { b64: String(r.result).split(',')[1], mime: blob.type || '', name: String(name || 'recording') });
+      const n = $('notes'); n.value = (n.value.trim() ? n.value.trim() + '\n\n' : '') + j.text;
+      st('Done. Check the text below and edit anything before sending.', 'ok');
+    } catch (e) { st('Transcription failed: ' + e.message + '. You can type the notes instead.', 'err'); }
+  };
+  r.readAsDataURL(blob);
+}
+
+$('sendBtn').onclick = async () => {
+  const f = { contact: $('contact').value.trim(), company: $('company').value.trim(), email: $('email').value.trim(), phone: $('phone').value.trim(),
+    type: $('type').value, space: $('space').value.trim(), units: $('units').value, notes: $('notes').value.trim() };
+  const done = (t, c) => { $('done').className = c; $('done').textContent = t; };
+  if (!f.contact || !f.email || !f.type) { done('Please fill in contact name, email and business type.', 'err'); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) { done('That email address does not look right.', 'err'); return; }
+  $('sendBtn').disabled = true; $('sendBtn').textContent = 'Sending…';
+  try {
+    const j = await api('api_submit', { f: f });
+    done(j.message, 'ok'); $('sendBtn').textContent = 'Sent ✓';
+    ['contact', 'company', 'email', 'phone', 'space', 'notes'].forEach(i => $(i).value = ''); $('type').value = ''; st('');
+  } catch (e) { done('Could not send: ' + e.message, 'err'); $('sendBtn').textContent = 'Send to ELIZE'; }
+  setTimeout(() => { $('sendBtn').disabled = false; $('sendBtn').textContent = 'Send to ELIZE'; }, 2500);
+};
+</script>
+</body></html>
