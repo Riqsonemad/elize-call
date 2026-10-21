@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>ELIZE</title>
+<style>body{margin:0;font-family:Arial,sans-serif;background:#fff;color:#222}#msg{max-width:520px;margin:40px auto;padding:0 16px;color:#555}</style></head>
+<body><div id="msg">Loading…</div><div id="app"></div>
+<script>
+const VALID=/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/;
+const h=new URLSearchParams(location.hash.slice(1)),U=h.get('u')||'';h.delete('u');
+const app=document.getElementById('app'),msg=document.getElementById('msg');
+function show(t){msg.style.display=t?'block':'none';msg.textContent=t||''}
+function obj(sp){const o={};sp.forEach((v,k)=>{o[k]=v});return o}
+async function call(m,p){
+  if(!VALID.test(U))return show('This link is not valid.');
+  show(m==='post'?'Saving…':'Loading…');
+  try{
+    const r=await fetch(U+'?action=api_page',{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({m:m,p:p}),credentials:'omit'});
+    const j=await r.json();if(!j.ok)throw new Error(j.error||'error');
+    app.innerHTML=j.html;if(j.title)document.title=j.title;show('');window.scrollTo(0,0);
+  }catch(e){show('Could not reach ELIZE. Check your connection and try again.')}
+}
+document.addEventListener('submit',e=>{e.preventDefault();const fd=new FormData(e.target);if(e.submitter&&e.submitter.name)fd.append(e.submitter.name,e.submitter.value);call('post',obj(fd))});
+document.addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;try{const x=new URL(a.href);if(x.origin+x.pathname===U){e.preventDefault();call('get',obj(x.searchParams))}}catch(_){}});
+addEventListener('hashchange',()=>location.reload());
+h.get('action')?call('get',obj(h)):show('This link is not valid.');
+</script></body></html>
