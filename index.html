@@ -33,6 +33,7 @@
 
 <div id="app">
 <div class="card">
+ <label>Centre</label><select id="centre"></select>
  <label>Contact name <span class="req">*</span></label><input id="contact" autocomplete="off">
  <label>Company / brand</label><input id="company" autocomplete="off">
  <label>Email address <span class="req">*</span></label><input id="email" type="email" autocomplete="off" autocapitalize="off">
@@ -94,6 +95,13 @@ async function api(action, body) {
     const c = await api('api_config');
     c.types.forEach(t => $('type').add(new Option(t, t)));
     c.units.forEach(u => $('units').add(new Option(u, u)));
+    const cs = c.centres || []; let last = ''; try { last = localStorage.getItem('elize_centre') || ''; } catch (e) {}
+    cs.forEach(n => $('centre').add(new Option(n, n)));
+    $('centre').value = cs.indexOf(last) >= 0 ? last : (c.defaultCentre || cs[0] || '');
+    const sync = () => { const def = $('centre').value === c.defaultCentre; $('units').disabled = !def; if (!def) $('units').selectedIndex = 0;
+      try { localStorage.setItem('elize_centre', $('centre').value); } catch (e) {} };
+    $('centre').onchange = sync; sync();
+    if (!cs.length) $('centre').style.display = 'none';
   } catch (e) { st('Could not reach ELIZE: ' + e.message, 'err'); }
 })();
 
@@ -139,7 +147,7 @@ function send(blob, name) {
 }
 
 $('sendBtn').onclick = async () => {
-  const f = { contact: $('contact').value.trim(), company: $('company').value.trim(), email: $('email').value.trim(), phone: $('phone').value.trim(),
+  const f = { centre: $('centre').value, contact: $('contact').value.trim(), company: $('company').value.trim(), email: $('email').value.trim(), phone: $('phone').value.trim(),
     type: $('type').value, space: $('space').value.trim(), units: $('units').value, notes: $('notes').value.trim() };
   const done = (t, c) => { $('done').className = c; $('done').textContent = t; };
   if (!f.contact || !f.email || !f.type) { done('Please fill in contact name, email and business type.', 'err'); return; }
